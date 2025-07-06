@@ -51,6 +51,7 @@ From your project root:
 ```bash
 dotnet restore
 dotnet publish -c Release -r win-x64 --self-contained false -o ./publish
+```
 
 This creates a deployable publish/ folder.
 
