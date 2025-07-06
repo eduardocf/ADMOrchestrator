@@ -1,0 +1,5 @@
+﻿@page
+@model IndexModel
+<h1>📊 Dependency Graph</h1>
+<img src="/graph.svg" style="width:100%;">
+<pre>@System.IO.File.ReadAllText("wwwroot/dependencies.json")</pre>
