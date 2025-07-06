@@ -1,4 +1,8 @@
-﻿namespace ADM.Orchestrator.Graph.Services;
+﻿using ADM.Orchestrator.Graph.Services;
+using Microsoft.Extensions.Hosting;
+using ADM.Orchestrator.Graph.Data;
+
+namespace ADM.Orchestrator.Graph.Services;
 
 public class SchedulerService : BackgroundService
 {
@@ -14,8 +18,8 @@ public class SchedulerService : BackgroundService
 
 		_intervalMinutes = config.GetValue<int?>("Scheduler:IntervalMinutes");
 
-		var fixedTimeStr = config.GetValue<string>("Scheduler:FixedTime");
-		if (TimeSpan.TryParse(fixedTimeStr, out var parsed))
+		var timeText = config.GetValue<string>("Scheduler:FixedTime");
+		if (TimeSpan.TryParse(timeText, out var parsed))
 			_fixedTime = parsed;
 	}
 
@@ -25,7 +29,7 @@ public class SchedulerService : BackgroundService
 		{
 			if (_intervalMinutes is not null)
 			{
-				await RunJob(stoppingToken);
+				await RunJobAsync(stoppingToken);
 				await Task.Delay(TimeSpan.FromMinutes(_intervalMinutes.Value), stoppingToken);
 			}
 			else if (_fixedTime is not null)
@@ -36,45 +40,57 @@ public class SchedulerService : BackgroundService
 					nextRun = nextRun.AddDays(1);
 
 				var delay = nextRun - now;
-				_logger.LogInformation($"Next run scheduled at: {nextRun:u} (in {delay.TotalMinutes:F1} minutes)");
+				_logger.LogInformation($"Next run scheduled at: {nextRun:u} ({delay.TotalMinutes:F1} mins)");
 				await Task.Delay(delay, stoppingToken);
 
-				await RunJob(stoppingToken);
+				await RunJobAsync(stoppingToken);
 			}
 			else
 			{
-				_logger.LogWarning("No valid scheduling configuration found. Skipping execution.");
-				await Task.Delay(TimeSpan.FromHours(1), stoppingToken); // fallback delay
+				_logger.LogWarning("No scheduling configuration found. Waiting 1 hour before retry.");
+				await Task.Delay(TimeSpan.FromHours(1), stoppingToken);
 			}
 		}
 	}
 
-	private async Task RunJob(CancellationToken stoppingToken)
+	private async Task RunJobAsync(CancellationToken stoppingToken)
 	{
-		using var scope = _services.CreateScope();
+		using IServiceScope scope = _services.CreateScope();
 		try
 		{
-			var cloner = scope.ServiceProvider.GetRequiredService<RepoCloner>();
-			var extractor = scope.ServiceProvider.GetRequiredService<DependencyExtractor>();
-			var dot = scope.ServiceProvider.GetRequiredService<DotBuilder>();
-			var renderer = scope.ServiceProvider.GetRequiredService<GraphRenderer>();
-			var html = scope.ServiceProvider.GetRequiredService<HtmlBuilder>();
-			var compare = scope.ServiceProvider.GetRequiredService<ComparisonBuilder>();
-			var db = scope.ServiceProvider.GetRequiredService<DatabaseWriter>();
+			RepoCloner cloner = scope.ServiceProvider.GetRequiredService<RepoCloner>();
+			DependencyExtractor extractor = scope.ServiceProvider.GetRequiredService<DependencyExtractor>();
+			DotBuilder dot = scope.ServiceProvider.GetRequiredService<DotBuilder>();
+			GraphRenderer renderer = scope.ServiceProvider.GetRequiredService<GraphRenderer>();
+			HtmlBuilder html = scope.ServiceProvider.GetRequiredService<HtmlBuilder>();
+			ComparisonBuilder compare = scope.ServiceProvider.GetRequiredService<ComparisonBuilder>();
+			DatabaseWriter database = scope.ServiceProvider.GetRequiredService<DatabaseWriter>();
 
+			// 1️⃣ Clone repositories
 			await cloner.CloneReposAsync();
-			var deps = await extractor.ExtractDependenciesAsync();
-			var dotSrc = dot.BuildDot(deps);
-			var svg = renderer.Render(dotSrc);
-			var htmlPg = html.Build(deps, svg);
-			var cmpPg = compare.Build(deps);
-			await db.SaveAsync(deps, svg);
 
-			_logger.LogInformation($"Graph orchestration completed at: {DateTime.UtcNow:u}");
+			// 2️⃣ Extract new structured dependencies
+			List<DependencyExtractor.DependencySet> structuredDeps = await extractor.ExtractDependenciesAsync();
+
+			// 3️⃣ Build DOT graph
+			string dotText = dot.BuildDot(structuredDeps);
+
+			// 4️⃣ Render SVG
+			string svg = renderer.Render(dotText);
+
+			// 5️⃣ Generate HTML and JSON output
+			string htmlPage = html.Build(structuredDeps, svg);
+			string comparePage = compare.Build(structuredDeps);
+
+			// 6️⃣ Save to database
+			await database.SaveAsync(structuredDeps, svg);
+
+
+			_logger.LogInformation($"Orchestration completed at {DateTime.UtcNow:u}");
 		}
 		catch (Exception ex)
 		{
-			_logger.LogError(ex, "Orchestration job failed.");
+			_logger.LogError(ex, "Scheduler orchestration failed");
 		}
 	}
 }

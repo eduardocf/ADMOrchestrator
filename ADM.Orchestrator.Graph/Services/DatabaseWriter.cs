@@ -1,6 +1,6 @@
 ﻿using ADM.Orchestrator.Graph.Data;
 using ADM.Orchestrator.Graph.Models;
-using System.Text.Json;
+using static ADM.Orchestrator.Graph.Services.DependencyExtractor;
 
 namespace ADM.Orchestrator.Graph.Services;
 
@@ -8,22 +8,32 @@ public class DatabaseWriter
 {
 	private readonly GraphDbContext _db;
 
-	public DatabaseWriter(GraphDbContext db) => _db = db;
-
-	public async Task SaveAsync(Dictionary<string, List<string>> graph, string svg)
+	public DatabaseWriter(GraphDbContext db)
 	{
-		foreach (var (project, deps) in graph)
+		_db = db;
+	}
+
+	public async Task SaveAsync(List<DependencySet> deps, string svg)
+	{
+		foreach (var d in deps)
 		{
-			var snapshot = new DependencySnapshot
+			var json = System.Text.Json.JsonSerializer.Serialize(new
+			{
+				project = d.Project,
+				nuget = d.Nuget,
+				dll = d.Dll
+			});
+
+			_db.Snapshots.Add(new DependencySnapshot
 			{
 				Id = Guid.NewGuid(),
-				ProjectName = project,
-				DependenciesJson = JsonSerializer.Serialize(deps),
+				ProjectName = d.Project,
+				DependenciesJson = json,
 				GraphSvg = svg,
 				Timestamp = DateTime.UtcNow
-			};
-			_db.Snapshots.Add(snapshot);
+			});
 		}
+
 		await _db.SaveChangesAsync();
 	}
 }

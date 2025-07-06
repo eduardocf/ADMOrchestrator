@@ -1,8 +1,6 @@
 using ADM.Orchestrator.Graph.Data;
 using ADM.Orchestrator.Graph.Services;
-using ADM.Orchestrator.Services;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Hosting;
 
 var builder = WebApplication.CreateBuilder(args);
 

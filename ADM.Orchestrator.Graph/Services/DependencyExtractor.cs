@@ -1,31 +1,52 @@
-﻿using System.Xml.Linq;
-
-namespace ADM.Orchestrator.Graph.Services;
+﻿namespace ADM.Orchestrator.Graph.Services;
 
 public class DependencyExtractor
 {
-	public async Task<Dictionary<string, List<string>>> ExtractDependenciesAsync()
+	public class DependencySet
 	{
-		var result = new Dictionary<string, List<string>>();
+		public string Project { get; set; } = "";
+		public List<string> Nuget { get; set; } = new();
+		public List<string> Dll { get; set; } = new();
+	}
+
+	public async Task<List<DependencySet>> ExtractDependenciesAsync()
+	{
+		var results = new List<DependencySet>();
+
 		foreach (var dir in Directory.GetDirectories("Repos"))
 		{
-			var project = Path.GetFileName(dir);
-			var deps = new List<string>();
+			var name = Path.GetFileName(dir);
+			var nuget = new HashSet<string>();
+			var dll = new HashSet<string>();
 
-			foreach (var csproj in Directory.GetFiles(dir, "*.csproj", SearchOption.AllDirectories))
+			foreach (var file in Directory.GetFiles(dir, "*.*", SearchOption.AllDirectories))
 			{
-				var doc = XDocument.Load(csproj);
-				deps.AddRange(
-					doc.Descendants("PackageReference")
-					   .Select(e => e.Attribute("Include")?.Value)
-					   .Where(v => !string.IsNullOrEmpty(v))
-					   .Select(v => v!)
-				);
+				if (file.EndsWith(".csproj"))
+				{
+					var doc = System.Xml.Linq.XDocument.Load(file);
+
+					nuget.UnionWith(doc.Descendants("PackageReference")
+						.Select(x => x.Attribute("Include")?.Value)
+						.Where(x => !string.IsNullOrWhiteSpace(x))!);
+
+					dll.UnionWith(doc.Descendants("Reference")
+						.Select(x => x.Attribute("Include")?.Value)
+						.Where(x => !string.IsNullOrWhiteSpace(x))!);
+
+					dll.UnionWith(doc.Descendants("COMReference")
+						.Select(x => x.Attribute("Include")?.Value)
+						.Where(x => !string.IsNullOrWhiteSpace(x))!);
+				}
 			}
 
-			result[project] = deps.Distinct().ToList();
+			results.Add(new DependencySet
+			{
+				Project = name,
+				Nuget = nuget.OrderBy(x => x).ToList(),
+				Dll = dll.OrderBy(x => x).ToList()
+			});
 		}
 
-		return await Task.FromResult(result);
+		return await Task.FromResult(results);
 	}
 }
