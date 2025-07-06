@@ -66,25 +66,13 @@ public class SchedulerService : BackgroundService
 			ComparisonBuilder compare = scope.ServiceProvider.GetRequiredService<ComparisonBuilder>();
 			DatabaseWriter database = scope.ServiceProvider.GetRequiredService<DatabaseWriter>();
 
-			// 1️⃣ Clone repositories
 			await cloner.CloneReposAsync();
-
-			// 2️⃣ Extract new structured dependencies
 			List<DependencyExtractor.DependencySet> structuredDeps = await extractor.ExtractDependenciesAsync();
-
-			// 3️⃣ Build DOT graph
 			string dotText = dot.BuildDot(structuredDeps);
-
-			// 4️⃣ Render SVG
 			string svg = renderer.Render(dotText);
-
-			// 5️⃣ Generate HTML and JSON output
 			string htmlPage = html.Build(structuredDeps, svg);
 			string comparePage = compare.Build(structuredDeps);
-
-			// 6️⃣ Save to database
 			await database.SaveAsync(structuredDeps, svg);
-
 
 			_logger.LogInformation($"Orchestration completed at {DateTime.UtcNow:u}");
 		}
