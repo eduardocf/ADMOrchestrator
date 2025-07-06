@@ -72,3 +72,39 @@ Grant read/write access to App Pool identity on:
 - /wwwroot/ (for graph.svg and JSON)
 - /Repos/ (local clone directory)
 - /OutputRepo/ (optional GitLab publisher)
+
+### 🔐 6. Update appsettings.json
+Inside your deployed site folder, update:
+
+```json
+"GitLab": {
+  "Token": "your-access-token",
+  "Repositories": [
+    "https://gitlab.com/yourproject/repo1.git",
+    "https://gitlab.com/yourproject/repo2.git"
+  ],
+  "OutputRepo": "https://gitlab.com/yourproject/output.git"
+},
+"Scheduler": {
+  "IntervalMinutes": 10,
+  "FixedTime": "01:30"
+}
+```
+
+You can choose either mode:
+- IntervalMinutes: 10 → run every 10 min
+- Leave it null and set FixedTime → run daily at specified time
+
+### 🧠 7. Test it Locally (Optional)
+From the project folder, just run:
+
+```bash
+dotnet run
+```
+
+This will:
+- Clone GitLab repos
+- Generate .dot graph and render SVG
+- Save JSON and HTML in wwwroot
+- Push rendered files to your GitLab output repo
+- Save snapshots to PostgreSQL
