@@ -73,7 +73,7 @@ Grant read/write access to App Pool identity on:
 - /Repos/ (local clone directory)
 - /OutputRepo/ (optional GitLab publisher)
 
-### 🔐 6. Update appsettings.json
+### 6. 🔐 Update appsettings.json
 Inside your deployed site folder, update:
 
 ```json
@@ -95,7 +95,7 @@ You can choose either mode:
 - IntervalMinutes: 10 → run every 10 min
 - Leave it null and set FixedTime → run daily at specified time
 
-### 🧠 7. Test it Locally (Optional)
+### 7. 🧠 Test it Locally (Optional)
 From the project folder, just run:
 
 ```bash
@@ -108,3 +108,59 @@ This will:
 - Save JSON and HTML in wwwroot
 - Push rendered files to your GitLab output repo
 - Save snapshots to PostgreSQL
+
+Visit:
+http://<your-server>:5000/
+
+You’ll see:
+- SVG graph visualization
+- JSON preview of dependencies
+- Comparison panel across apps
+
+### 8. 🔍 Output Overview
+| File | Description | 
+| /wwwroot/dependencies.json | Structured dependency data | 
+| /wwwroot/index.html | Dashboard with SVG and JSON display | 
+| /wwwroot/compare.html | Cross-project dependency comparison | 
+| /wwwroot/graph.svg | Visual dependency graph from Graphviz | 
+
+
+🧾 Dependencies JSON Output Format
+```json
+[
+  {
+    "project": "Application01",
+    "nuget": ["Azure.Core", "Newtonsoft.Json"],
+    "dll": "Application02"
+  }
+]
+```
+🧾 Graphviz file Output Format
+```graphviz
+digraph Dependencies {
+  node[shape=ellipse style="rounded,filled" color="lightgoldenrodyellow" ]
+  "Application01" -> "Azure.Core" [color=black];
+  "Azure.Core" [shape=box, color="#e6f0ff"];
+  "Application01" -> "Newtonsoft.Json" [color=black];
+  "Newtonsoft.Json" [shape=box, color="#e6f0ff"];
+  "Application01" -> "Application02" [color=blue];
+  "Application02" [shape=ellipse, color="lightgoldenrodyellow"];
+  "Application02" -> "Swashbuckle.AspNetCore" [color=black];
+  "Swashbuckle.AspNetCore" [shape=box, color="#e6f0ff"];
+  "Application02" -> "Application04" [color=blue];
+  "Application04" [shape=ellipse, color="lightgoldenrodyellow"];
+  "Application02" -> "Application05" [color=blue];
+  "Application05" [shape=ellipse, color="lightgoldenrodyellow"];
+  "Application03" -> "Newtonsoft.Json" [color=black];
+  "Newtonsoft.Json" [shape=box, color="#e6f0ff"];
+  "Application03" -> "Application05" [color=blue];
+  "Application05" [shape=ellipse, color="lightgoldenrodyellow"];
+  "Application04" -> "RabbitMQ.Client" [color=black];
+  "RabbitMQ.Client" [shape=box, color="#e6f0ff"];
+  "Application04" -> "Application03" [color=blue];
+  "Application03" [shape=ellipse, color="lightgoldenrodyellow"];
+  "Application05" -> "Dapper" [color=black];
+  "Dapper" [shape=box, color="#e6f0ff"];
+}
+```
+
